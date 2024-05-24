@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python Test - Questions</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ace-builds@1.4.12/src/ace.css" type="text/css" media="screen" charset="utf-8">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+        .flash-message {
+            display: none;
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background-color: green;
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .modal {
+            display: none; 
+            position: fixed; 
+            z-index: 1; 
+            left: 0;
+            top: 0;
+            width: 100%; 
+            height: 100%; 
+            overflow: auto; 
+            background-color: rgb(0,0,0); 
+            background-color: rgba(0,0,0,0.4); 
+            padding-top: 60px;
+        }
+        .modal-content {
+            background-color: #fefefe;
+            margin: 5% auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 500px;
+            border-radius: 10px;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+        }
+        .close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="dark-theme">
+    <div class="container">
+        <h1>Did you code? Submit the question before moving to the next one.</h1>
+        <div class="timer">
+            <p>Time Left: <span id="timer">10:00</span></p>
+            <p>Questions Left: <span id="questionsLeft"></span></p>
+        </div>
+        <div class="question">
+            <h2 id="question-title"></h2>
+            <p id="question-description"></p>
+            <p>Input: <span id="question-input"></span></p>
+            <p>Output: <span id="question-output"></span></p>
+            <div id="editor"></div>
+        </div>
+        <button id="previousButton" onclick="previousQuestion()">Previous</button>
+        <button id="nextButton" onclick="nextQuestion()">Next</button>
+        <button onclick="submitTest()">Submit Question</button>
+        <button onclick="toggleTheme()">Toggle Theme</button>
+
+    </div>
+    <div class="flash-message" id="flash-message">Submitted successfully!</div>
+    <div id="emptyResponseModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="close" onclick="closeModal()">&times;</span>
+                <h2>Empty Response</h2>
+            </div>
+            <div class="modal-body">
+                <p>Your response is empty. Do you want to submit it anyway?</p>
+            </div>
+            <div class="modal-footer">
+                <button onclick="confirmEmptySubmit()">Yes</button>
+                <button onclick="closeModal()">No</button>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/ace-builds@1.4.12/src/ace.js"></script>
+    <script>
+        var editor = ace.edit("editor");
+        editor.setTheme("ace/theme/monokai");
+        editor.getSession().setMode("ace/mode/python");
+        editor.setFontSize("16px");
+
+        var questions = JSON.parse('{{ questions | tojson | safe }}');
+        var currentQuestionIndex = 0;
+
+        function displayQuestion() {
+            if (questions.length === 0) {
+                alert("No more questions!");
+                window.location.href = "/finished";
+                return;
+            }
+            var currentQuestion = questions[currentQuestionIndex];
+            document.getElementById("question-title").textContent = currentQuestion.title;
+            document.getElementById("question-description").textContent = currentQuestion.description;
+            document.getElementById("question-input").textContent = currentQuestion.input;
+            document.getElementById("question-output").textContent = currentQuestion.output;
+            editor.setValue(""); // Clear editor content for new question
+        }
+
+        function previousQuestion() {
+            currentQuestionIndex--;
+            if (currentQuestionIndex < 0) {
+                currentQuestionIndex = questions.length - 1; // Wrap around to last question
+            }
+            displayQuestion();
+        }
+
+        function nextQuestion() {
+            currentQuestionIndex++;
+            if (currentQuestionIndex >= questions.length) {
+                currentQuestionIndex = 0; // Wrap around to first question
+            }
+            displayQuestion();
+            checkButtonStates();
+        }
+
+        function submitTest() {
+            var response = editor.getValue();
+            if (response.trim() === "") {
+                openModal();
+                return;
+            }
+
+            submitResponse(response);
+        }
+
+        function submitResponse(response) {
+            var username = "{{ session['username'] }}";
+
+            var xhttp = new XMLHttpRequest();
+            xhttp.open("POST", "/submit_response", true);
+            xhttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+            xhttp.onreadystatechange = function() {
+                if (this.readyState === XMLHttpRequest.DONE) {
+                    if (this.status === 200) {
+                        showFlashMessage("Submitted successfully!");
+                        questions.splice(currentQuestionIndex, 1);
+                        updateQuestionsLeft(); //update questions left
+                        if (questions.length === 0) {
+                            window.location.href = "/finished";
+                        } else {
+                            displayQuestion();
+                            checkButtonStates();
+                        }
+                    }
+                }
+            }
+            xhttp.send("username=" + username + "&response=" + encodeURIComponent(response));
+        }
+
+        function openModal() {
+            var modal = document.getElementById("emptyResponseModal");
+            modal.style.display = "block";
+        }
+
+        function closeModal() {
+            var modal = document.getElementById("emptyResponseModal");
+            modal.style.display = "none";
+        }
+
+        function confirmEmptySubmit() {
+            closeModal();
+            submitResponse("");
+        }
+
+        function showFlashMessage(message) {
+            var flashMessage = document.getElementById("flash-message");
+            flashMessage.textContent = message;
+            flashMessage.style.display = "block";
+            setTimeout(function() {
+                flashMessage.style.display = "none";
+            }, 3000);
+        }
+
+        function checkButtonStates() {
+            document.getElementById("previousButton").disabled = currentQuestionIndex === 0;
+            document.getElementById("nextButton").disabled = currentQuestionIndex >= questions.length;
+        }
+
+        function toggleTheme() {
+            var theme = document.body.classList.contains("dark-theme") ? "light-theme" : "dark-theme";
+            document.body.classList.toggle("dark-theme");
+            editor.setTheme(theme === "dark-theme" ? "ace/theme/monokai" : "ace/theme/chrome");
+        }
+
+        // Timer functionality
+        function startTimer(duration, display) {
+            var timer = duration, minutes, seconds;
+            setInterval(function () {
+                minutes = parseInt(timer / 60, 10);
+                seconds = parseInt(timer % 60, 10);
+
+                minutes = minutes < 10 ? "0" + minutes : minutes;
+                seconds = seconds < 10 ? "0" + seconds : seconds;
+
+                display.textContent = minutes + ":" + seconds;
+
+                if (--timer < 0) {
+                    timer = 0;
+                    alert("Time's up!");
+                    window.location.href = "/finished";
+                }
+            }, 1000);
+        }
+
+        function updateQuestionsLeft() {
+            var questionsLeft = questions.length;
+            document.getElementById("questionsLeft").textContent = questionsLeft;
+        }
+
+        window.onload = function () {
+            // Check if the timer has already started
+            var timerStarted = sessionStorage.getItem('timerStarted');
+
+            if (!timerStarted) {
+                var timeLeft = 60 * 45; // 45 minutes
+                sessionStorage.setItem('timerStarted', true);
+                sessionStorage.setItem('startTime', Date.now()); // Store the start time
+            } else {
+                var startTime = parseInt(sessionStorage.getItem('startTime'));
+                var currentTime = Date.now();
+                var elapsedTime = (currentTime - startTime) / 1000; // Convert milliseconds to seconds
+                var timeLeft = Math.max(60 * 60 - elapsedTime, 0); // Calculate remaining time
+            }
+
+            var display = document.querySelector('#timer');
+            startTimer(timeLeft, display);
+        };
+
+        displayQuestion();
+        checkButtonStates();
+        updateQuestionsLeft();
+    </script>
+</body>
+</html>
