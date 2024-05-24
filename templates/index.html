@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to Python Online Test</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <style>
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        h1, h2 {
+            margin-bottom: 20px;
+        }
+        .instructions {
+            text-align: left;
+            margin-bottom: 30px;
+        }
+        .instructions p {
+            margin: 10px 0;
+            font-size: 18px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+        .form-group button {
+            padding: 10px 20px;
+            font-size: 16px;
+            color: #fff;
+            background-color: #28a745;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .form-group button:hover {
+            background-color: #218838;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Welcome to the coding Test Platform</h1>
+        <h2>Read Instructions</h2>
+        <div class="instructions">
+            <p>1. <strong>Each question is submitted Independently. Immidiately submit before moving to the next or changes will be lost!!</strong></p>
+            <p>2. The test time is <strong>1hr</strong>. Manage your time well.</p>
+            <p>4. Submit without Answering to <strong>skip a question.</strong></p>
+            <p>3. All AI generated responses are disqualified.</p>
+        </div>
+        <form action="/questions" method="post">
+            <div class="form-group">
+                <input type="text" name="username" placeholder="Enter your username" required>
+            </div>
+            <div class="form-group">
+                <button type="submit">Start Test</button>
+            </div>
+        </form>
+    </div>
+</body>
+</html>
