@@ -78,6 +78,7 @@
         </div>
         <button id="previousButton" onclick="previousQuestion()">Previous</button>
         <button id="nextButton" onclick="nextQuestion()">Next</button>
+        <button onclick="testCode()">Test Code</button>
         <button onclick="submitTest()">Submit Question</button>
         <button onclick="toggleTheme()">Toggle Theme</button>
 
@@ -173,6 +174,30 @@
             xhttp.send("username=" + username + "&response=" + encodeURIComponent(response));
         }
 
+        function testCode() {
+            var response = editor.getValue();
+            var questionTitle = document.getElementById("question-title").textContent;
+
+            var xhttp = new XMLHttpRequest();
+            xhttp.open("POST", "/test_code", true);
+            xhttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+            xhttp.onreadystatechange = function() {
+                if (this.readyState === XMLHttpRequest.DONE) {
+                    if (this.status === 200) {
+                        var result = JSON.parse(this.responseText);
+                        if (result.success) {
+                            showFlashMessage("Test passed successfully!");
+                        } else {
+                            showFlashMessage("Test failed: " + result.message);
+                        }
+                    } else {
+                        showFlashMessage("Error: " + this.status + "We're still working on this feature");
+                    }
+                }
+            }
+            xhttp.send("question_title=" + encodeURIComponent(questionTitle) + "&response=" + encodeURIComponent(response));
+        }
+
         function openModal() {
             var modal = document.getElementById("emptyResponseModal");
             modal.style.display = "block";
@@ -238,7 +263,7 @@
             var timerStarted = sessionStorage.getItem('timerStarted');
 
             if (!timerStarted) {
-                var timeLeft = 60 * 45; // 45 minutes
+                var timeLeft = 60 * 90; // 45 minutes
                 sessionStorage.setItem('timerStarted', true);
                 sessionStorage.setItem('startTime', Date.now()); // Store the start time
             } else {
