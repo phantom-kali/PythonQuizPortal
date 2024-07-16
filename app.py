@@ -47,9 +47,6 @@ def test_cases():
         response = request.form['response']
         question_title = request.form.get('question_title')
 
-        print(f"Received response: {response}\n")
-        print(f"Received question_title: {question_title}")
-
         if not response or not question_title:
             return jsonify({'success': False, 'message': 'Missing data in request'}), 400
         
@@ -60,8 +57,6 @@ def test_cases():
             return jsonify({'success': False, 'message': 'Invalid function definition'}), 400
 
         function_name = function_def.name
-
-        print(f"\nThis is the function name: {function_name}\n")
 
         # Create a restricted global environment
         safe_globals = {
@@ -102,7 +97,6 @@ def test_cases():
 
         return jsonify({'success': False, 'message': 'Question title not found'}), 400
     except Exception as e:
-        print(f"\nError in test_cases: {str(e)}\n")
         return jsonify({'success': False, 'message': str(e)}), 400
 
 def load_test_cases():
