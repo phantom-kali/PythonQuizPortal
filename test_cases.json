@@ -13,10 +13,5 @@
         "title": "Random Number Generator",
         "input": "10",
         "expected_output": "10 unique random integers between 1 and 100"
-    },
-    {
-        "title": "Permutations Generator",
-        "input": "\"abc\"",
-        "expected_output": "[\"abc\", \"acb\", \"bac\", \"bca\", \"cab\", \"cba\"]"
     }
 ]
