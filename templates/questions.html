@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Python Test - Questions</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ace-builds@1.4.12/src/ace.css" type="text/css" media="screen" charset="utf-8">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ace-builds@1.4.12/src/ace.css" type="text/css"
+        media="screen" charset="utf-8">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <style>
         .flash-message {
@@ -13,24 +15,41 @@
             position: fixed;
             top: 10px;
             right: 10px;
-            background-color: green;
-            color: white;
             padding: 10px;
             border-radius: 5px;
+            color: white;
         }
+
+        .flash-message.success {
+            background-color: green;
+        }
+
+        .flash-message.error {
+            background-color: red;
+        }
+
+        .flash-message.warning {
+            background-color: orange;
+        }
+
+        .flash-message.info {
+            background-color: blue;
+        }
+
         .modal {
-            display: none; 
-            position: fixed; 
-            z-index: 1; 
+            display: none;
+            position: fixed;
+            z-index: 1;
             left: 0;
             top: 0;
-            width: 100%; 
-            height: 100%; 
-            overflow: auto; 
-            background-color: rgb(0,0,0); 
-            background-color: rgba(0,0,0,0.4); 
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgb(0, 0, 0);
+            background-color: rgba(0, 0, 0, 0.4);
             padding-top: 60px;
         }
+
         .modal-content {
             background-color: #fefefe;
             margin: 5% auto;
@@ -40,20 +59,24 @@
             max-width: 500px;
             border-radius: 10px;
         }
+
         .modal-header {
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
+
         .modal-footer {
             display: flex;
             justify-content: flex-end;
         }
+
         .close {
             color: #aaa;
             font-size: 28px;
             font-weight: bold;
         }
+
         .close:hover,
         .close:focus {
             color: black;
@@ -62,6 +85,7 @@
         }
     </style>
 </head>
+
 <body class="dark-theme">
     <div class="container">
         <h1>Did you code? Submit the question before moving to the next one.</h1>
@@ -84,6 +108,7 @@
 
     </div>
     <div class="flash-message" id="flash-message">Submitted successfully!</div>
+    <div class="flash-message" id="flash-messages" style="display: none;"></div>
     <div id="emptyResponseModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
@@ -156,7 +181,7 @@
             var xhttp = new XMLHttpRequest();
             xhttp.open("POST", "/submit_response", true);
             xhttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
-            xhttp.onreadystatechange = function() {
+            xhttp.onreadystatechange = function () {
                 if (this.readyState === XMLHttpRequest.DONE) {
                     if (this.status === 200) {
                         showFlashMessage("Submitted successfully!");
@@ -178,48 +203,63 @@
             var response = editor.getValue();
             var questionTitle = document.getElementById("question-title").textContent;
 
-            var xhttp = new XMLHttpRequest();
-            xhttp.open("POST", "/test_code", true);
-            xhttp.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
-            xhttp.onreadystatechange = function() {
-                if (this.readyState === XMLHttpRequest.DONE) {
-                    if (this.status === 200) {
-                        var result = JSON.parse(this.responseText);
-                        if (result.success) {
-                            showFlashMessage("Test passed successfully!");
-                        } else {
-                            showFlashMessage("Test failed: " + result.message);
-                        }
-                    } else {
-                        showFlashMessage("Error: " + this.status + "We're still working on this feature");
-                    }
-                }
+            // Basic client-side validation
+            if (!response.trim()) {
+                showFlashMessage("Error: Please enter some code before testing.", "error");
+                return;
             }
-            xhttp.send("question_title=" + encodeURIComponent(questionTitle) + "&response=" + encodeURIComponent(response));
+
+            // Create form data
+            var formData = new FormData();
+            formData.append("question_title", questionTitle);
+            formData.append("response", response);
+
+            // Use fetch API
+            fetch('/test_code', {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            })
+                .then(response => {
+                    if (!response.ok) {
+                        return response.text().then(text => {
+                            throw new Error(`HTTP error! status: ${response.status}, body: ${text}`);
+                        });
+                    }
+                    return response.json();
+                })
+                .then(result => {
+                    if (result.success) {
+                        showFlashMessage("Test passed successfully!", "success");
+                    } else {
+                        showFlashMessage("Test failed: " + result.message, "error");
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    showFlashMessage("An error occurred while testing the code. Please check the console for details.", "error");
+                });
         }
 
-        function openModal() {
-            var modal = document.getElementById("emptyResponseModal");
-            modal.style.display = "block";
-        }
-
-        function closeModal() {
-            var modal = document.getElementById("emptyResponseModal");
-            modal.style.display = "none";
-        }
-
-        function confirmEmptySubmit() {
-            closeModal();
-            submitResponse("");
-        }
-
-        function showFlashMessage(message) {
-            var flashMessage = document.getElementById("flash-message");
-            flashMessage.textContent = message;
-            flashMessage.style.display = "block";
-            setTimeout(function() {
-                flashMessage.style.display = "none";
-            }, 3000);
+        function showFlashMessage(message, type = 'success') {
+            var flashDiv = document.getElementById('flash-messages');
+            if (flashDiv) {
+                flashDiv.textContent = message;
+                flashDiv.className = 'flash-message'; // Reset the class
+                flashDiv.classList.add(type); // Add the type-specific class
+                flashDiv.style.display = 'block';
+                setTimeout(() => {
+                    flashDiv.style.display = 'none';
+                }, 5000); // Hide message after 5 seconds
+            } else if (flashMessage) {
+                flashMessage.textContent = message;
+                flashMessage.style.display = "block";
+                setTimeout(function () {
+                    flashMessage.style.display = "none";
+                }, 3000);
+            }
         }
 
         function checkButtonStates() {
@@ -282,4 +322,5 @@
         updateQuestionsLeft();
     </script>
 </body>
+
 </html>

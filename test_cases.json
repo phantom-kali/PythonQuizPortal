@@ -12,6 +12,6 @@
     {
         "title": "Random Number Generator",
         "input": "10",
-        "expected_output": "10 unique random integers between 1 and 100"
+        "expected_output": "10"
     }
 ]

@@ -3,9 +3,16 @@ import os
 import json
 from datetime import datetime
 import re
+import random
+import ast
+import time
+from functools import wraps
+from werkzeug.utils import secure_filename
+from flask_wtf.csrf import CSRFProtect
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'
+# csrf = CSRFProtect(app)
 
 @app.route('/')
 def index():
@@ -33,71 +40,123 @@ def questions():
     else:
         return redirect('/')
     
+
 @app.route('/test_code', methods=["POST"])
 def test_cases():
     try:
         response = request.form['response']
         question_title = request.form.get('question_title')
+
+        print(f"Received response: {response}\n")
+        print(f"Received question_title: {question_title}")
+
         if not response or not question_title:
             return jsonify({'success': False, 'message': 'Missing data in request'}), 400
+        
+        # Parse the function
+        tree = ast.parse(response)
+        function_def = tree.body[0]
+        if not isinstance(function_def, ast.FunctionDef):
+            return jsonify({'success': False, 'message': 'Invalid function definition'}), 400
 
-        # Extract function name from response
-        match = re.search(r'def\s+(\w+)\(', response)
-        if match:
-            function_name = match.group(1)
-            print(function_name)
-        else:
-            return jsonify({'success': False, 'message': 'Function definition not found in response'}), 400
+        function_name = function_def.name
 
-        exec(response)  
+        print(f"\nThis is the function name: {function_name}\n")
 
-        test_cases = load_test_cases() 
+        # Create a restricted global environment
+        safe_globals = {
+            '__builtins__': {
+                'range': range,
+                'len': len,
+                'int': int,
+                'float': float,
+                'str': str,
+                'list': list,
+                'dict': dict,
+                'set': set,
+                'tuple': tuple,
+                'sum': sum,
+                'min': min,
+                'max': max,
+                'random': random,
+                'print': print
+            }
+        }
+
+        exec(response, safe_globals)
+
+        user_function = safe_globals[function_name]
+
+        test_cases = load_test_cases()
         for testcase in test_cases:
             if testcase['title'] == question_title:
-                input_data = testcase['input']
-                expected_output = testcase['expected_output']
+                input_data = ast.literal_eval(testcase['input'])
+                expected_output = ast.literal_eval(testcase['expected_output'])
 
-                # Execute the function with input data
-                output = function_name(input_data)
+                output = user_function(input_data)
 
                 if output == expected_output:
                     return jsonify({'success': True}), 200
                 else:
-                    return jsonify({'success': False, 'message': 'Test failed'}), 200
+                    return jsonify({'success': False, 'message': 'Test failed. Expected {} but got {}'.format(expected_output, output)}), 200
 
         return jsonify({'success': False, 'message': 'Question title not found'}), 400
-
     except Exception as e:
+        print(f"\nError in test_cases: {str(e)}\n")
         return jsonify({'success': False, 'message': str(e)}), 400
-
 
 def load_test_cases():
     with open('test_cases.json') as f:
         return json.load(f)
 
+# Rate limiting
+def rate_limit(limit=10, per=60):
+    def decorator(f):
+        @wraps(f)
+        def wrapped(*args, **kwargs):
+            if not hasattr(wrapped, 'last_request'):
+                wrapped.last_request = {}
+            now = time.time()
+            ip = request.remote_addr
+            if ip in wrapped.last_request:
+                if now - wrapped.last_request[ip] < per / limit:
+                    return jsonify({'error': 'Rate limit exceeded'}), 429
+            wrapped.last_request[ip] = now
+            return f(*args, **kwargs)
+        return wrapped
+    return decorator
+
+@app.after_request
+def add_security_headers(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    return response
 
 @app.route('/submit_response', methods=['POST'])
+@rate_limit(limit=5, per=60)  # 5 requests per minute
 def submit_response():
     username = session.get('username')
     if not username:
         flash("Unauthorized access", "error")
         return redirect('/')
-
+    
     response = request.form['response']
     if not response:
         return "empty"
-
-    # Sanitize and validate input, skipping this to maintain code structure
-    sanitized_response = response
-
+    
+    sanitized_response = response  # TODO: sanitize while maintaing identation
+    
     if not os.path.exists('responses'):
         os.makedirs('responses')
-
-    filename = f"responses/{username}.txt"
+    
+    filename = secure_filename(f"{username}.txt")
+    filepath = os.path.join('responses', filename)
+    
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    with open(filename, 'a') as f:
+    with open(filepath, 'a') as f:
         f.write(f"{sanitized_response}\nSubmitted on: {timestamp}\n\n")
-
+    
     return redirect('/finished')
 
 @app.route('/finished')
